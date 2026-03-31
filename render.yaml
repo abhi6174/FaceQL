@@ -1,12 +1,12 @@
 databases:
   - name: faceql-db
     databaseName: faceql
-    user: postgres
     plan: free # or standard depending on your needs
 
 services:
   - type: keyvalue
     name: faceql-redis
+    ipAllowList: []
     plan: free # or standard
 
   - type: web
