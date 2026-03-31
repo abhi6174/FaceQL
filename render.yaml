@@ -1,0 +1,69 @@
+databases:
+  - name: faceql-db
+    databaseName: faceql
+    user: postgres
+    plan: free # or standard depending on your needs
+
+services:
+  - type: keyvalue
+    name: faceql-redis
+    plan: free # or standard
+
+  - type: web
+    name: faceql-backend
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn backend.app.main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: FRONTEND_URLS
+        sync: false # Set this to your actual Render frontend URL, or '*' to allow all.
+      - key: DATABASE_URL
+        fromDatabase:
+          name: faceql-db
+          property: connectionString
+      - key: CELERY_BROKER_URL
+        fromService:
+          type: keyvalue
+          name: faceql-redis
+          property: connectionString
+      - key: S3_BUCKET_NAME
+        sync: false
+      - key: AWS_ACCESS_KEY_ID
+        sync: false
+      - key: AWS_SECRET_ACCESS_KEY
+        sync: false
+
+  - type: worker
+    name: faceql-celery
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: celery -A backend.worker.celery_app worker --loglevel=info
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: faceql-db
+          property: connectionString
+      - key: CELERY_BROKER_URL
+        fromService:
+          type: keyvalue
+          name: faceql-redis
+          property: connectionString
+      - key: S3_BUCKET_NAME
+        sync: false
+      - key: AWS_ACCESS_KEY_ID
+        sync: false
+      - key: AWS_SECRET_ACCESS_KEY
+        sync: false
+
+  - type: web
+    name: faceql-frontend
+    env: static
+    buildCommand: npm install && npm run build
+    publishPath: dist
+    rootDir: frontend
+    envVars:
+      - key: VITE_API_URL
+        fromService:
+          type: web
+          name: faceql-backend
+          property: hostport
